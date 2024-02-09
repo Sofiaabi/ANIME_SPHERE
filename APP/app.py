@@ -1,25 +1,19 @@
-# several helpful packages to load
-import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
-import streamlit as st # Web app
-
+# Importing necessary libraries
+import numpy as np
+import pandas as pd
+import streamlit as st
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
+
+# Hide warnings
 warnings.filterwarnings('ignore')
 
-
-
-# Loading the dataset
+# Load the dataset
 df = pd.read_csv('C:/Users/Sofia/Documents/ANIME_SPHERE/DATA/anime.csv')
 
-
-# observing the first few observations
-print(df.head((10)))
-
-
-
-def get_anime_recommendations(title, df):
+# Function to get anime recommendations
+def get_anime_recommendations(selected_anime, anime_count, df):
     # Create binary genre columns
     genre_columns = df['Genre'].str.get_dummies(sep=', ').columns
     
@@ -43,22 +37,49 @@ def get_anime_recommendations(title, df):
     anime_data = df[similarity_cols]
     anime_sim_matrix = cosine_similarity(anime_data)
     
-    # Get the index of the anime title
-    title_index = df[df['Title'] == title].index[0]
+    # Initialize list to store recommendations
+    all_recommendations = []
     
-    # Get the similarity values for the given anime title
-    sim_values = anime_sim_matrix[title_index].argsort()[::-1][1:]
+    # Get the indices of selected anime
+    selected_indices = df[df['Title'].isin(selected_anime)].index
     
-    # Get the top 10 anime titles with the highest similarity values
-    top_anime_titles = df.iloc[sim_values]['Title'].tolist()[:10]
+    # Get recommendations for each selected anime
+    for index in selected_indices:
+        # Get the similarity values for the selected anime title
+        sim_values = anime_sim_matrix[index].argsort()[::-1][1:]
+        
+        # Get the top anime titles with the highest similarity values
+        top_anime_titles = df.iloc[sim_values]['Title'].tolist()[:anime_count]
+        
+        all_recommendations.extend(top_anime_titles)
     
-    # Create a numbered list of recommendations
-    recommendations = "\n".join([f"{i+1}. {anime_title}" for i, anime_title in enumerate(top_anime_titles)])
+    # Remove duplicates and limit the number of recommendations
+    all_recommendations = list(set(all_recommendations))[:anime_count]
     
-    return recommendations
+    return all_recommendations
 
-# Get anime recommendations for "Koe no Katachi"
-anime_recommendations = get_anime_recommendations("Koe no Katachi", df)
+# Streamlit app
+def main():
+    # Set page title
+    st.title('Anime Recommendation Engine')
+    
+    # Sidebar section
+    st.sidebar.title('Settings')
+    
+    # Select anime
+    selected_anime = st.sidebar.multiselect('Select Anime', df['Title'], df['Title'].iloc[0])
+    
+    # Select number of recommendations
+    anime_count = st.sidebar.slider('Number of Recommendations', min_value=1, max_value=10, value=5)
+    
+    # Recommendation button
+    if st.sidebar.button('Recommend'):
+        anime_recommendations = get_anime_recommendations(selected_anime, anime_count, df)
+        st.subheader('Top Anime Recommendations')
+        for i, anime in enumerate(anime_recommendations):
+            st.write(f"{i+1}. {anime}")
 
-# Print the recommendations
-print(anime_recommendations)
+# Run the app
+if __name__ == '__main__':
+    main()
+
