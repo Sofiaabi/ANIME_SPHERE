@@ -1,4 +1,3 @@
-# Importing necessary libraries
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -60,26 +59,56 @@ def get_anime_recommendations(selected_anime, anime_count, df):
 
 # Streamlit app
 def main():
-    # Set page title
-    st.title('Anime Recommendation Engine')
+    # Sidebar Design
+    st.sidebar.title('Anime Sphere 🌐')
+    st.sidebar.subheader('Explore Anime Recommendations with Ease!')
+    app_mode = st.sidebar.radio("Navigation", ["Anime Recommender", "About", "Contact"], index=0)
     
-    # Sidebar section
-    st.sidebar.title('Settings')
-    
-    # Select anime
-    selected_anime = st.sidebar.multiselect('Select Anime', df['Title'], df['Title'].iloc[0])
-    
-    # Select number of recommendations
-    anime_count = st.sidebar.slider('Number of Recommendations', min_value=1, max_value=10, value=5)
-    
-    # Recommendation button
-    if st.sidebar.button('Recommend'):
-        anime_recommendations = get_anime_recommendations(selected_anime, anime_count, df)
-        st.subheader('Top Anime Recommendations')
-        for i, anime in enumerate(anime_recommendations):
-            st.write(f"{i+1}. {anime}")
+    # Main Content
+    if app_mode == "Anime Recommender":
+        st.title('Anime Recommendation Engine 🎥')
+        
+        st.markdown("""
+        Select your favorite anime and get personalized recommendations based on genres, ratings, and more! 
+        Simply choose from the list of popular anime, and we’ll suggest similar titles you may love.
+        """)
+        
+        # Anime Selection with Search Box
+        selected_anime = st.multiselect('Pick Your Favorite Anime 🎬', df['Title'], default=[df['Title'].iloc[0]])
+        
+        # Number of Recommendations
+        anime_count = st.slider('How many recommendations do you want?', min_value=1, max_value=10, value=5)
+        
+        # Recommendation Button with icon
+        with st.spinner('Generating recommendations...'):
+            if st.button('Get Recommendations 🌟'):
+                anime_recommendations = get_anime_recommendations(selected_anime, anime_count, df)
+                st.subheader('✨ Top Anime Recommendations')
+                for i, anime in enumerate(anime_recommendations):
+                    st.markdown(f"{i+1}. **{anime}**")
+
+    elif app_mode == "About":
+        st.title("About This App 👨‍💻")
+        st.markdown("""
+        Welcome to the **Anime Sphere**! This app uses a **cosine similarity algorithm** to recommend anime based on genres, ratings, and user interaction.
+        
+        Whether you're looking for action-packed adventures or heartwarming stories, we've got recommendations tailored to your taste.
+        """)
+        st.write("Made with 💙 by Sofia.")
+
+    elif app_mode == "Contact":
+        st.title("Get in Touch 📬")
+        st.markdown("""
+        If you have any questions or feedback, feel free to reach out to me via email/linkedIn:
+        - **Email**: [sofiaabielmi@gmail.com](mailto:sofiaabielmi@gmail.com)
+        - **LinkedIn**: [Sofia's LinkedIn](https://www.linkedin.com/in/sofia-abi-elmi/)
+        """)
 
 # Run the app
 if __name__ == '__main__':
     main()
+
+
+
+
 
