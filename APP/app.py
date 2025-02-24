@@ -106,7 +106,7 @@ def main():
     
     # Main Content
     if app_mode == "Anime Recommender":
-        st.title('Anime Recommendation Engine 🎥')
+        st.title('Anime Recommendor Engine 🎥')
         
         st.markdown("""Select your favorite anime and get personalized recommendations based on genres, ratings, and more!""")
         
