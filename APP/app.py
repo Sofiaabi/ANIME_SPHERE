@@ -7,128 +7,138 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
 
-# Hide warnings
 warnings.filterwarnings('ignore')
 
-# Function to download a file from Google Drive
-def download_file_from_google_drive(file_id, destination):
+# --- Cache the downloaded files ---
+@st.cache_resource
+def download_and_load_file(file_id, filename):
     URL = f"https://drive.google.com/uc?export=download&id={file_id}"
     session = requests.Session()
     response = session.get(URL, stream=True)
-    
-    with open(destination, "wb") as f:
+
+    with open(filename, "wb") as f:
         for chunk in response.iter_content(1024):
             if chunk:
                 f.write(chunk)
+    return filename
 
-# Download the dataset from Google Drive
-download_file_from_google_drive('1rE1-_6LvV9Hyp_jaNok8XwqiBQxLzj4y', 'anime.csv')
-
-# Download the background image from Google Drive
-download_file_from_google_drive('1ZvEB01G9fTEs7Mf_Q6K4fJAMLAO-ZOtG', 'background.jpg')
-
-# Load the dataset
-df = pd.read_csv('anime.csv')
-
-# Function to set background image
-def set_background_image(image_path):
-    # Convert image to base64
+# --- Improved CSS for background and text readability ---
+@st.cache_data
+def get_background_style(image_path):
     with open(image_path, "rb") as f:
         img_bytes = f.read()
     img_b64 = base64.b64encode(img_bytes).decode()
-
-    # CSS for background image
-    st.markdown(
-        f"""
+    return f"""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
         .stApp {{
-            background-image: url('data:image/jpeg;base64,{img_b64}');
+            background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url("data:image/jpeg;base64,{img_b64}");
             background-size: cover;
-            background-position: center;
             background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-position: center;
+            font-family: 'Roboto', sans-serif;
+        }}
+
+        h1, h2, h3, h4, h5, h6,
+        .stMarkdown, .stText, .css-18e3th9, .css-1v0mbdj {{
+            color: #FFAD5B !important;
+            font-weight: bold !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }}
+
+        p, span {{
+            color: #20EFEC !important;
+            font-weight: bold !important;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }}
+
+        .stButton button {{
+            color: #ffa500 !important;
+            font-weight: bold;
+            text-shadow: none;
+            background-color: rgba(0,0,0,0.4);
+            border: 1px solid #ffa500;
         }}
         </style>
-        """, unsafe_allow_html=True
-    )
+    """
 
-# Function to get anime recommendations
-def get_anime_recommendations(selected_anime, anime_count, df):
-    # Create binary genre columns
+# --- Cache dataset and preprocessed values ---
+@st.cache_data
+def load_and_prepare_data():
+    df = pd.read_csv('anime.csv')
     genre_columns = df['Genre'].str.get_dummies(sep=', ').columns
     genre_df = df['Genre'].str.get_dummies(sep=', ')[genre_columns]
-    
-    # Merge the genre dataframe with the original dataframe
     df = pd.concat([df, genre_df], axis=1)
-    
-    # Fill NaN values with zeros
     df.fillna(0, inplace=True)
-    
-    # Scale the rating and members columns
+
     scaler = StandardScaler()
     df[['Score', 'Members']] = scaler.fit_transform(df[['Score', 'Members']])
-    
-    # Select the columns to use for similarity
     similarity_cols = ['Score', 'Members'] + list(genre_columns)
-    
-    # Compute the cosine similarity matrix
-    anime_data = df[similarity_cols]
-    anime_sim_matrix = cosine_similarity(anime_data)
-    
-    # Initialize list to store recommendations
-    all_recommendations = []
-    
-    # Get the indices of selected anime
-    selected_indices = df[df['Title'].isin(selected_anime)].index
-    
-    # Get recommendations for each selected anime
-    for index in selected_indices:
-        # Get the similarity values for the selected anime title
-        sim_values = anime_sim_matrix[index].argsort()[::-1][1:]
-        
-        # Get the top anime titles with the highest similarity values
-        top_anime_titles = df.iloc[sim_values]['Title'].tolist()[:anime_count]
-        
-        all_recommendations.extend(top_anime_titles)
-    
-    # Remove duplicates and limit the number of recommendations
-    all_recommendations = list(set(all_recommendations))[:anime_count]
-    
-    return all_recommendations
+    anime_sim_matrix = cosine_similarity(df[similarity_cols])
 
-# Streamlit app
+    return df, anime_sim_matrix
+
+# --- Load files only once ---
+download_and_load_file('1rE1-_6LvV9Hyp_jaNok8XwqiBQxLzj4y', 'anime.csv')
+download_and_load_file('1ZvEB01G9fTEs7Mf_Q6K4fJAMLAO-ZOtG', 'background.jpg')
+
+# --- Main function ---
 def main():
-    # Set background image
-    set_background_image('background.jpg')
+    st.markdown(get_background_style('background.jpg'), unsafe_allow_html=True)
 
-    # Sidebar Design
-    st.sidebar.subheader('Explore Anime Recommendations with Ease!')
-    app_mode = st.sidebar.radio("Navigation", ["Anime Recommender", "About", "Contact"], index=0)
-    
-    # Main Content
-    if app_mode == "Anime Recommender":
-        st.title('Anime Recommendor Engine 🎥')
-        
-        st.markdown("""Select your favorite anime and get personalized recommendations based on genres, ratings, and more!""")
-        
+    # --- Custom Top-Right Navigation ---
+    nav_options = ["🎥 Anime Recommender", "ℹ️ About", "📬 Contact"]
+    if "app_mode" not in st.session_state:
+        st.session_state.app_mode = nav_options[0]
+
+    col1, col2, col3, col4 = st.columns([4, 3, 2, 2])
+    with col2:
+        if st.button("🎥 Recommender"):
+            st.session_state.app_mode = "🎥 Anime Recommender"
+    with col3:
+        if st.button("ℹ️ About"):
+            st.session_state.app_mode = "ℹ️ About"
+    with col4:
+        if st.button("📬 Contact"):
+            st.session_state.app_mode = "📬 Contact"
+
+    if st.session_state.app_mode not in nav_options:
+        st.session_state.app_mode = nav_options[0]
+
+    # --- Main App Logic ---
+    if st.session_state.app_mode == "🎥 Anime Recommender":
+        st.title('Anime Recommender Engine 🎥')
+        st.markdown("Select your favorite anime and get personalized recommendations.")
+
+        df, anime_sim_matrix = load_and_prepare_data()
         selected_anime = st.multiselect('Pick Your Favorite Anime 🎬', df['Title'], default=[df['Title'].iloc[0]])
-        anime_count = st.slider('How many recommendations do you want?', min_value=1, max_value=10, value=5)
-        
-        with st.spinner('Generating recommendations...'):
-            if st.button('Get Recommendations 🌟'):
-                anime_recommendations = get_anime_recommendations(selected_anime, anime_count, df)
-                st.subheader('✨ Top Anime Recommendations')
-                for i, anime in enumerate(anime_recommendations):
+        anime_count = st.slider('How many recommendations do you want?', 1, 10, 5)
+
+        if st.button('Get Recommendations 🌟'):
+            with st.spinner('Generating recommendations...'):
+                indices = df[df['Title'].isin(selected_anime)].index
+                all_recommendations = []
+
+                for index in indices:
+                    sim_scores = anime_sim_matrix[index].argsort()[::-1][1:]
+                    recommended = df.iloc[sim_scores]['Title'].tolist()
+                    all_recommendations.extend(recommended)
+
+                unique_recommendations = list(set(all_recommendations))[:anime_count]
+                st.subheader('Top Anime Recommendations')
+                for i, anime in enumerate(unique_recommendations):
                     st.markdown(f"{i+1}. **{anime}**")
 
-    elif app_mode == "About":
-        st.title("About This App 👨‍💻")
-        st.markdown("""Welcome to the **Anime Sphere**! This app uses a **cosine similarity algorithm** to recommend anime based on genres, ratings, and user interaction.""")
-        st.write("Made with 💙 by Sofia.")
+    elif st.session_state.app_mode == "ℹ️ About":
+        st.title("About This App 👩‍💻")
+        st.markdown("Welcome to **Anime Sphere**! A simple, beginner friendly recommendation system using cosine similarity.")
 
-    elif app_mode == "Contact":
+    elif st.session_state.app_mode == "📬 Contact":
         st.title("Get in Touch 📬")
-        st.markdown("""If you have any questions or feedback, feel free to reach out to me via email/linkedIn: - **Email**: [sofiaabielmi@gmail.com](mailto:sofiaabielmi@gmail.com)""")
+        st.markdown("📩 Email: [sofiaabielmi@gmail.com](mailto:sofiaabielmi@gmail.com)")
+        st.markdown("💻 GitHub: [github.com/sofiaabielmi](https://github.com/Sofiaabi)")
 
-# Run the app
 if __name__ == '__main__':
     main()
